@@ -1,0 +1,5 @@
+{
+  "name": "Content Creator AI",
+  "description": "An autonomous app to plan and execute multimodal content campaigns (Video, Image, Voiceover) based on user requests, moving from high-level intent to concrete binary assets.",
+  "requestFramePermissions": []
+}
