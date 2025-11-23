@@ -10,50 +10,39 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Chakra+Petch:wght@600;700&display=swap" rel="stylesheet">
     <style>
-      @keyframes gradient-pulse {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-      }
-
       :root {
         --font-body: 'Inter', sans-serif;
         --font-heading: 'Chakra Petch', sans-serif;
       }
 
       html[data-theme='dark'] {
-        --color-background: #111111;
-        --color-background-secondary: #18181b;
-        --color-background-tertiary: #27272a;
-        --color-text-primary: #ffffff;
-        --color-text-secondary: #a1a1aa;
-        --color-text-accent: #d946ef;
-        --color-border-primary: #3f3f46;
-        --color-primary: #a855f7;
-        --color-primary-hover: #9333ea;
-        --color-accent: #d946ef;
-        --color-accent-secondary: #c026d3;
+        --color-background: #121212;
+        --color-background-secondary: #1E1E1E;
+        --color-background-tertiary: #2a2a2e;
+        --color-text-primary: #EAEAEA;
+        --color-text-secondary: #a0a0a0;
+        --color-text-accent: #00C4B3;
+        --color-border-primary: #383838;
+        --color-primary: #00A99D;
+        --color-primary-hover: #008a7e;
+        --color-accent: #FF8C42;
+        --color-accent-secondary: #ff7723;
         --gradient-primary: linear-gradient(to right, var(--color-primary), var(--color-accent));
-        --background-image: 
-            radial-gradient(at 80% 20%, hsla(289, 80%, 50%, 0.15) 0px, transparent 50%),
-            radial-gradient(at 10% 90%, hsla(210, 80%, 55%, 0.15) 0px, transparent 50%),
-            radial-gradient(at 50% 50%, hsla(330, 80%, 55%, 0.1) 0px, transparent 50%);
       }
 
       html[data-theme='light'] {
-        --color-background: #f4f4f5;
-        --color-background-secondary: #ffffff;
-        --color-background-tertiary: #e4e4e7;
+        --color-background: #ffffff;
+        --color-background-secondary: #f7f7f7;
+        --color-background-tertiary: #eeeeee;
         --color-text-primary: #18181b;
         --color-text-secondary: #52525b;
-        --color-text-accent: #9333ea;
+        --color-text-accent: #007BFF;
         --color-border-primary: #d4d4d8;
-        --color-primary: #9333ea;
-        --color-primary-hover: #7e22ce;
-        --color-accent: #c026d3;
-        --color-accent-secondary: #a21caf;
+        --color-primary: #007BFF;
+        --color-primary-hover: #006ae0;
+        --color-accent: #00A99D;
+        --color-accent-secondary: #008a7e;
         --gradient-primary: linear-gradient(to right, var(--color-primary), var(--color-accent));
-        --background-image: none;
       }
 
       html[data-theme='synthwave'] {
@@ -69,19 +58,12 @@
         --color-accent: #ff00ff;
         --color-accent-secondary: #cc00cc;
         --gradient-primary: linear-gradient(to right, var(--color-accent), var(--color-primary));
-        --background-image: 
-            linear-gradient(rgba(13, 2, 33, 0.8), rgba(13, 2, 33, 0.8)),
-            linear-gradient(to bottom, transparent 98%, var(--color-primary) 98%),
-            linear-gradient(to right, transparent 98%, var(--color-primary) 98%);
       }
 
       body {
         font-family: var(--font-body);
         color: var(--color-text-primary);
         background-color: var(--color-background);
-        background-image: var(--background-image);
-        background-size: 150% 150%, 50px 50px, 50px 50px;
-        animation: gradient-pulse 20s ease infinite;
       }
 
       h1, h2, h3, h4, h5, h6 {
@@ -99,7 +81,7 @@
 }
 </script>
 </head>
-  <body class="text-white">
+  <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

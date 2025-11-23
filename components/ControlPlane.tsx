@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { type GeneratedCampaign, type CreativeConcept, UiComponent, UiComponentType, ComponentData } from '../types';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { type GeneratedCampaign, type CreativeConcept, UiComponent, UiComponentType, ComponentData, Format } from '../types';
 import { MediaModal } from './ImageModal';
 import { Icon } from './Icon';
 import { FilterMenu, type Filters } from './FilterMenu';
@@ -9,12 +9,20 @@ interface ControlPlaneProps {
   campaigns: GeneratedCampaign[];
   uiComponents: UiComponent[];
   onSelectConcept: (concept: CreativeConcept) => void;
+  onDeleteCampaign: (id: string | number) => void;
+  format?: Format;
 }
 
 const WelcomeMessage: React.FC = () => (
-  <div className="text-center m-auto">
-    <h2 className="text-3xl font-bold text-[var(--color-text-primary)]">Start Your Creation</h2>
-    <p className="text-[var(--color-text-secondary)] mt-2">Use the prompt bar below to bring your ideas to life.</p>
+  <div className="text-center m-auto flex flex-col items-center justify-center h-full">
+    <div className="bg-[var(--color-background)]/50 backdrop-blur-md p-8 rounded-xl">
+      <h2 className="text-5xl font-bold text-[var(--color-text-primary)]" style={{fontFamily: 'var(--font-heading)'}}>
+        Your AI Creation Studio
+      </h2>
+      <p className="text-[var(--color-text-secondary)] mt-4 max-w-lg">
+        Describe your idea in the prompt bar below. Let AI agents handle the creative execution, from concepts to final assets.
+      </p>
+    </div>
   </div>
 );
 
@@ -60,7 +68,20 @@ const ConceptCard: React.FC<{ concept: CreativeConcept; onSelect: () => void; is
   );
 };
 
-const GeneratedMediaItem: React.FC<{ campaign: GeneratedCampaign; onClick: () => void }> = ({ campaign, onClick }) => {
+const GeneratedMediaItem: React.FC<{ campaign: GeneratedCampaign; onClick: () => void; onDelete: (id: string | number) => void }> = ({ campaign, onClick, onDelete }) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
     <div 
       className="relative overflow-hidden rounded-lg group border border-[var(--color-border-primary)] cursor-pointer aspect-[16/9]"
@@ -97,12 +118,43 @@ const GeneratedMediaItem: React.FC<{ campaign: GeneratedCampaign; onClick: () =>
         <h3 className="font-bold text-white text-lg">{campaign.title}</h3>
         <p className="text-gray-300 text-sm line-clamp-2">{campaign.description}</p>
       </div>
+       <div className="absolute top-2 right-2 z-20">
+            <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setIsMenuOpen(!isMenuOpen);
+                }}
+                className="p-2 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
+                aria-haspopup="true"
+                aria-expanded={isMenuOpen}
+                aria-label="More options"
+            >
+                <Icon path="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" className="w-5 h-5" />
+            </button>
+            {isMenuOpen && (
+                <div ref={menuRef} className="absolute right-0 mt-2 w-36 origin-top-right bg-[var(--color-background-secondary)] border border-[var(--color-border-primary)] rounded-md shadow-lg z-30">
+                    <div className="py-1">
+                        <button
+                             onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete(campaign.id);
+                                setIsMenuOpen(false);
+                            }}
+                            className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-red-800/20 hover:text-red-300"
+                        >
+                            <Icon path="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" className="w-4 h-4" />
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
     </div>
   );
 };
 
 
-export const ControlPlane: React.FC<ControlPlaneProps> = ({ campaigns, uiComponents, onSelectConcept }) => {
+export const ControlPlane: React.FC<ControlPlaneProps> = ({ campaigns, uiComponents, onSelectConcept, onDeleteCampaign, format }) => {
   const [selectedCampaign, setSelectedCampaign] = useState<GeneratedCampaign | null>(null);
   const [filters, setFilters] = useState<Filters>({ style: 'all', duration: 'all', keyword: '' });
 
@@ -152,14 +204,18 @@ export const ControlPlane: React.FC<ControlPlaneProps> = ({ campaigns, uiCompone
   const renderContent = () => {
     if (campaigns.length > 0) {
       return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-          {campaigns.map((campaign) => (
-            <GeneratedMediaItem 
-              key={campaign.id} 
-              campaign={campaign} 
-              onClick={() => setSelectedCampaign(campaign)} 
-            />
-          ))}
+        <div className="animate-fade-in">
+          <h2 className="text-2xl font-bold text-center mb-6">Session Dashboard</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {campaigns.map((campaign) => (
+              <GeneratedMediaItem 
+                key={campaign.id} 
+                campaign={campaign} 
+                onClick={() => setSelectedCampaign(campaign)} 
+                onDelete={onDeleteCampaign}
+              />
+            ))}
+          </div>
         </div>
       );
     }
@@ -167,7 +223,7 @@ export const ControlPlane: React.FC<ControlPlaneProps> = ({ campaigns, uiCompone
     if (uiComponents.length > 0) {
       return (
          <div className="space-y-8">
-            {statusComponents.length > 0 && (
+            {statusComponents.length > 0 && format !== 'voiceover' && (
                 <div className="bg-[var(--color-background-secondary)]/80 border border-[var(--color-border-primary)] rounded-lg p-6 animate-fade-in">
                     <h2 className="text-xl font-semibold mb-4 text-[var(--color-text-primary)] flex items-center gap-2">
                         <Icon path="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" className="w-5 h-5" />

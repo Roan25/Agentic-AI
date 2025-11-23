@@ -103,3 +103,9 @@ export const LOADING_MESSAGES = [
   "Composing a symphony of colors...",
   "Crafting your vision into reality..."
 ];
+
+export const MOCK_SESSIONS: {id: string; title: string; date: string}[] = [
+  { id: 'session_1', title: 'Solaris Energy Drink Ad', date: 'Today' },
+  { id: 'session_2', title: 'Lunar Project Pitch', date: 'Yesterday' },
+  { id: 'session_3', title: 'Q4 Product Launch Video', date: '3 days ago' },
+];

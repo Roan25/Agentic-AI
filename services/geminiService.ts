@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, FunctionDeclaration, Content, GenerateContentResponse, Modality } from "@google/genai";
-import { type CreativeConcept, type GeneratedCampaign, type AspectRatio, type ImageQuality, type VideoQuality, Format, type TestCase, type TestResult, VoiceStyle, Language, EvaluationScore, ObservabilityMetrics, UiComponent, UiComponentType, ComponentData, A2AStatus } from '../types';
+import { type CreativeConcept, type GeneratedCampaign, type AspectRatio, type ImageQuality, type VideoQuality, Format, type TestCase, type TestResult, VoiceStyle, Language, EvaluationScore, ObservabilityMetrics, UiComponent, UiComponentType, ComponentData, A2AStatus, TargetDuration } from '../types';
 import { MOCK_BRAND_GUIDELINES } from '../constants';
 
 // Create a new instance for each call to ensure the latest API key is used
@@ -251,7 +251,7 @@ const generateVideoAsyncTool: FunctionDeclaration = {
             resolution: {
                 type: Type.STRING,
                 enum: ["720p", "1080p", "1440p", "2160p"],
-                description: "The resolution of the output video. Higher resolutions like 2160p (4K) or 1080p increase generation latency."
+                description: "The resolution of the output video. Higher resolutions increase generation latency."
             }
         },
         required: ["prompt", "aspect_ratio", "resolution"]
@@ -370,17 +370,53 @@ function executeRenderUiComponent(payload: { component_type: UiComponentType, co
 }
 
 
-async function getAgentFirstResponse(request: string, sessionHistory: CreativeConcept[], onProgress: (message: string) => void): Promise<{response: GenerateContentResponse, history: Content[], toolResult: any}> {
+async function getAgentFirstResponse(
+    request: string, 
+    sessionHistory: CreativeConcept[], 
+    settings: {
+        format: Format;
+        aspectRatio: AspectRatio;
+        imageQuality: ImageQuality;
+        videoQuality: VideoQuality;
+        voiceStyle: VoiceStyle;
+        language: Language;
+        targetDuration: TargetDuration;
+    }, 
+    onProgress: (message: string) => void, 
+    uploadedImage?: { data: string, mimeType: string }
+): Promise<{response: GenerateContentResponse, history: Content[], toolResult: any}> {
     const ai = getAI();
     const reasoningModel = 'gemini-3-pro-preview'; // Use Pro for complex planning
 
     const historyText = sessionHistory.length > 0
         ? `\n### SESSION MEMORY (Implicit Learning)\nThe user's selections from this session are provided below. Analyze these selections to understand their emerging preferences for style, themes, and tone. Use this context to generate new concepts that are more aligned with what they've previously liked.\n\n**Previous Selections:**\n${JSON.stringify(sessionHistory.map(c => ({ title: c.title, style: c.style })), null, 2)}`
         : '';
+    
+    let settingsText = `\n\n**Generation Settings:**\nThe user has pre-selected the following output settings. Your creative concepts MUST be compatible with these choices. You do not need to ask the user for this information, just use it.\n`;
+    settingsText += `- **Format:** ${settings.format}\n`;
+    switch (settings.format) {
+        case 'image':
+            settingsText += `- **Aspect Ratio:** ${settings.aspectRatio}\n`;
+            settingsText += `- **Quality:** ${settings.imageQuality}\n`;
+            break;
+        case 'video':
+            settingsText += `- **Aspect Ratio:** ${settings.aspectRatio}\n`;
+            settingsText += `- **Quality:** ${settings.videoQuality}\n`;
+            settingsText += `- **Target Duration:** ${settings.targetDuration}\n`;
+            break;
+        case 'voiceover':
+            settingsText += `- **Voice Style:** ${settings.voiceStyle}\n`;
+            settingsText += `- **Language:** ${settings.language}\n`;
+            settingsText += `- **Target Duration:** ${settings.targetDuration}\n`;
+            break;
+    }
+
+    const imageText = uploadedImage ? `\n**User-Provided Image:** The user has uploaded an image. Your creative concepts should focus on animating or building upon this specific image. The main subject is already defined.` : '';
+
 
     const conversationHistory: Content[] = [{
       role: 'user',
-      parts: [{ text: `${AGENT_SYSTEM_PROMPT}${historyText}\n\n**User Request:** "${request}"` }]
+      parts: [{ text: `${AGENT_SYSTEM_PROMPT}${settingsText}${historyText}${imageText}\n\n**User Request:** "${request}"` }]
     }];
   
     // == Step 1: Legal Review Delegation ==
@@ -453,7 +489,7 @@ async function getAgentFirstResponse(request: string, sessionHistory: CreativeCo
                       style: { type: Type.STRING },
                       image_prompt: { type: Type.STRING },
                       video_prompt: { type: Type.STRING },
-                      voiceover_prompt: { type: Type.STRING },
+                      voiceover_prompt: { type: Type.STRING, description: "The script for the voiceover. CRITICAL: The length of this script MUST be appropriate for the target duration_seconds when spoken." },
                       duration_seconds: { type: Type.NUMBER }
                     },
                     required: ["id", "title", "description", "style", "image_prompt"],
@@ -479,13 +515,89 @@ async function getAgentFirstResponse(request: string, sessionHistory: CreativeCo
     return { response: finalResponse, history: conversationHistory, toolResult };
 }
 
+interface TriageResult {
+    category: 'CREATIVE_REQUEST' | 'SAFETY_VIOLATION' | 'AMBIGUOUS';
+    reason: string;
+}
+
+async function triageUserRequest(request: string): Promise<TriageResult> {
+    const ai = getAI();
+    const triageModel = 'gemini-flash-lite-latest';
+
+    const triagePrompt = `
+        You are a Triage Agent. Your job is to classify the user's request into one of three categories based on the brand safety guidelines.
+        
+        **Safety Guidelines to check for:**
+        - No targeted harassment of public figures.
+        - No requests to alter the brand logo in prohibited ways (e.g., graffiti).
+        - No depiction of dangerous stunts.
+        - No controversial topics (politics, religion).
+
+        **Categories:**
+        1.  **CREATIVE_REQUEST:** The request is safe, clear, and ready for the creative team.
+        2.  **SAFETY_VIOLATION:** The request explicitly violates one of the safety guidelines.
+        3.  **AMBIGUOUS:** The request is too vague to act upon (e.g., "make a video").
+
+        **User Request:** "${request}"
+
+        Analyze the request and provide your classification.
+    `;
+
+    const response = await ai.models.generateContent({
+        model: triageModel,
+        contents: [{ role: 'user', parts: [{ text: triagePrompt }] }],
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    category: { type: Type.STRING, enum: ['CREATIVE_REQUEST', 'SAFETY_VIOLATION', 'AMBIGUOUS'] },
+                    reason: { type: Type.STRING, description: "A brief explanation for your classification." }
+                },
+                required: ["category", "reason"]
+            }
+        }
+    });
+
+    return JSON.parse(response.text.trim());
+}
+
 
 export async function generateCreativeConcepts(
     request: string, 
     sessionHistory: CreativeConcept[], 
-    onProgress: (message: string) => void
+    settings: {
+        format: Format;
+        aspectRatio: AspectRatio;
+        imageQuality: ImageQuality;
+        videoQuality: VideoQuality;
+        voiceStyle: VoiceStyle;
+        language: Language;
+        targetDuration: TargetDuration;
+    },
+    onProgress: (message: string) => void,
+    uploadedImage?: { data: string, mimeType: string }
 ): Promise<{ uiComponents: UiComponent[] } | { aiResponseType: 'clarification' | 'refusal', message: string }> {
     
+    onProgress("Triaging request for safety and clarity...");
+    const triageResult = await triageUserRequest(request);
+
+    if (triageResult.category === 'SAFETY_VIOLATION') {
+        onProgress("Request blocked by Triage Agent.");
+        return {
+            aiResponseType: 'refusal',
+            message: `Request blocked by initial safety check. Reason: ${triageResult.reason}`
+        };
+    }
+
+    if (triageResult.category === 'AMBIGUOUS') {
+        onProgress("Request is ambiguous.");
+        return {
+            aiResponseType: 'clarification',
+            message: `The Triage Agent found the request too vague and requires more detail. Reason: ${triageResult.reason}`
+        };
+    }
+
     const uiComponents: UiComponent[] = [];
 
     // --- MOCK A2UI FLOW ---
@@ -549,7 +661,7 @@ export async function generateCreativeConcepts(
     });
 
     onProgress("Generating creative concepts...");
-    const { response } = await getAgentFirstResponse(request, sessionHistory, onProgress);
+    const { response } = await getAgentFirstResponse(request, sessionHistory, settings, onProgress, uploadedImage);
     const jsonText = response.text.trim();
 
     if (!jsonText.startsWith('{') && !jsonText.startsWith('[')) {
@@ -689,57 +801,94 @@ async function generateImage(prompt: string, aspectRatio: AspectRatio, imageSize
     return { imageData, metrics };
 }
 
+export async function editImage(base64ImageData: string, mimeType: string, prompt: string): Promise<string> {
+    const ai = getAI();
+
+    const imagePart = {
+        inlineData: {
+            data: base64ImageData,
+            mimeType: mimeType,
+        },
+    };
+
+    const textPart = { text: prompt };
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: { parts: [imagePart, textPart] },
+    });
+
+    for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData) {
+            return part.inlineData.data;
+        }
+    }
+
+    throw new Error("Image editing failed to produce a new image.");
+}
+
+
 async function generateVideo(
   prompt: string, 
   aspectRatio: AspectRatio, 
-  resolution: VideoQuality, 
+  resolution: VideoQuality,
   onProgress: (message: string) => void,
   image?: { imageBytes: string, mimeType: string }
 ): Promise<{ mediaUrl: string, metrics: { failoverUsed: boolean, retries: number } }> {
     const ai = getAI();
     
-    const callApi = async (currentResolution: VideoQuality): Promise<string> => {
-        const payload: {
-            model: string;
-            prompt: string;
-            config: any;
-            image?: { imageBytes: string, mimeType: string };
-        } = {
-            model: 'veo-3.1-fast-generate-preview',
-            prompt: prompt,
-            config: {
-                numberOfVideos: 1,
-                resolution: currentResolution,
-                aspectRatio: aspectRatio
-            }
-        };
-
-        if (image) {
-            payload.image = {
-                imageBytes: image.imageBytes,
-                mimeType: image.mimeType,
-            };
+    const callApi = async (): Promise<string> => {
+        let finalResolution: '720p' | '1080p' = '720p';
+        if (resolution === '1080p' || resolution === '1440p' || resolution === '2160p') {
+            finalResolution = '1080p';
+        } else {
+            finalResolution = '720p';
         }
 
-        let operation = await ai.models.generateVideos(payload);
+        if (resolution === '1440p' || resolution === '2160p') {
+            onProgress(`[Compatibility] ${resolution} is not supported for video generation. Using 1080p instead.`);
+        }
         
-        onProgress(`Video rendering job started (ID: ${operation.name}). This may take a few minutes.`);
+        onProgress('Initiating Veo video generation...');
+        let operation = await ai.models.generateVideos({
+            model: 'veo-3.1-fast-generate-preview',
+            prompt: prompt,
+            ...(image && { image: { imageBytes: image.imageBytes, mimeType: image.mimeType } }),
+            config: {
+                numberOfVideos: 1,
+                resolution: finalResolution,
+                aspectRatio: aspectRatio,
+            }
+        });
+
+        onProgress(`Video rendering job started with Veo (ID: ${operation.name}). This may take a few minutes.`);
 
         while (!operation.done) {
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            await new Promise(resolve => setTimeout(resolve, 10000)); // Poll every 10 seconds
+            onProgress(`Checking status for Veo job ${operation.name}...`);
             operation = await ai.operations.getVideosOperation({ operation: operation });
         }
 
-        const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-        if (!downloadLink) {
-            throw new Error("Video generation completed, but no download link was found.");
+        if (operation.error) {
+            throw new Error(`Veo video generation failed. Reason: ${operation.error.message}`);
         }
         
-        const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
-        if (!videoResponse.ok) {
-            throw new Error(`Failed to download video: ${videoResponse.statusText}`);
+        const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+        if (!downloadLink) {
+             throw new Error("Veo task succeeded, but no video URL was found.");
         }
-        const blob = await videoResponse.blob();
+
+        onProgress('Downloading video from Veo...');
+        const apiKey = process.env.API_KEY;
+        if (!apiKey) {
+            throw new Error("[UNRECOVERABLE] API key is not configured for video download.");
+        }
+        
+        const videoFetchResponse = await fetch(`${downloadLink}&key=${apiKey}`);
+        if (!videoFetchResponse.ok) {
+            throw new Error(`Failed to download video from Veo: ${videoFetchResponse.statusText}`);
+        }
+        const blob = await videoFetchResponse.blob();
         
         return new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -747,18 +896,13 @@ async function generateVideo(
             reader.onerror = reject;
             reader.readAsDataURL(blob);
         });
-    }
+    };
 
-    const primaryCall = () => callApi(resolution);
+    const primaryCall = () => callApi();
     
-    const failoverCall = () => {
-      const failoverResolution: VideoQuality = resolution === '1080p' ? '720p' : '720p';
-      if (resolution === '720p') return null;
-      onProgress(`[Failover] Downgrading video resolution to ${failoverResolution}.`);
-      return callApi(failoverResolution);
-    }
-    
-    const { result: mediaUrl, metrics } = await withRetryAndFailover(primaryCall, failoverCall, onProgress);
+    // Veo API doesn't have different quality settings to "failover" to in this implementation,
+    // so we disable the failover function by passing `null`. Retries will still work.
+    const { result: mediaUrl, metrics } = await withRetryAndFailover(primaryCall, null, onProgress);
     return { mediaUrl, metrics };
 }
 
@@ -873,7 +1017,8 @@ export async function generateFinalAsset(
     voiceStyle: VoiceStyle,
     language: Language,
     memoryStatus: ObservabilityMetrics['memoryStatus'],
-    onProgress: (message: string) => void
+    onProgress: (message: string) => void,
+    uploadedImage?: { data: string, mimeType: string }
 ): Promise<GeneratedCampaign | { aiResponseType: 'refusal', message: string }> {
     console.log(`[Memory] User has selected style: '${concept.style}'. Agent is now in execution mode.`);
     const ai = getAI();
@@ -903,6 +1048,8 @@ export async function generateFinalAsset(
       - **Image Prompt:** ${concept.image_prompt}
       - **Video Prompt:** ${concept.video_prompt}
       - **Voiceover Prompt:** ${concept.voiceover_prompt}
+      - **Target Duration:** ${concept.duration_seconds} seconds
+      ${uploadedImage ? '- **Note:** The user has provided a starting image; the video prompt should animate this image.' : ''}
 
       The user wants a final asset in **'${format}'** format with the following settings:
       ${format === 'image' ? `- **Aspect Ratio:** ${aspectRatio}\n      - **Quality/Resolution:** ${imageQuality}` : ''}
@@ -912,7 +1059,7 @@ export async function generateFinalAsset(
       **Your Action:**
       1.  First, call the \`log_implicit_preference\` tool to record this successful concept. Use the style as the name and the relevant prompt as the content. Give it a success_rating of 10.
       2.  Second, call the appropriate tool ('generate_image', 'generate_video_async', or 'generate_voiceover') to create the asset.
-      3.  Use the concept's specific prompts ('image_prompt', 'video_prompt', or 'voiceover_prompt') to generate the asset.
+      3.  Use the concept's specific prompts ('image_prompt', 'video_prompt', or 'voiceover_prompt') to generate the asset. For voiceovers, ensure the script in the 'prompt' argument is the correct length for the target duration.
       4.  Ensure you use the exact aspect ratio and quality/resolution settings provided above in the tool call.
     `;
 
@@ -961,25 +1108,27 @@ export async function generateFinalAsset(
         mediaUrl = `data:image/png;base64,${imageData}`;
         generationMetrics = metrics;
     } else if (generationCall.name === 'generate_video_async') {
-        onProgress('Executing image-to-video pipeline...');
         const args = generationCall.args as { prompt: string, aspect_ratio: AspectRatio, resolution: VideoQuality };
         
-        onProgress('Step 1/2: Generating initial image...');
-        const { imageData: base64ImageData, metrics: imageMetrics } = await generateImage(concept.image_prompt, args.aspect_ratio, imageQuality, onProgress);
+        let imageForVideo: { imageBytes: string, mimeType: string } | undefined = undefined;
+        if (uploadedImage) {
+            onProgress('Using uploaded image for video generation...');
+            imageForVideo = {
+                imageBytes: uploadedImage.data.split(',')[1], // remove data URL prefix
+                mimeType: uploadedImage.mimeType,
+            };
+        }
 
-        const imageForVideo = {
-            imageBytes: base64ImageData,
-            mimeType: 'image/png'
-        };
-
-        onProgress('Step 2/2: Generating video from image...');
-        const { mediaUrl: videoUrl, metrics: videoMetrics } = await generateVideo(args.prompt, args.aspect_ratio, args.resolution, onProgress, imageForVideo);
+        const { mediaUrl: videoUrl, metrics: videoMetrics } = await generateVideo(
+            args.prompt, 
+            args.aspect_ratio, 
+            args.resolution, 
+            onProgress, 
+            imageForVideo
+        );
         mediaUrl = videoUrl;
+        generationMetrics = videoMetrics;
 
-        generationMetrics = {
-            failoverUsed: imageMetrics.failoverUsed || videoMetrics.failoverUsed,
-            retries: imageMetrics.retries + videoMetrics.retries,
-        };
     } else if (generationCall.name === 'generate_voiceover') {
         onProgress('Generating voiceover...');
         const args = generationCall.args as { prompt: string, voice_style: VoiceStyle, language: Language };
@@ -1008,7 +1157,7 @@ export async function generateFinalAsset(
 
 async function evaluateWithLlmJudge(userInput: string, ragContext: string, agentAction: string): Promise<EvaluationScore> {
   const ai = getAI();
-  const model = 'gemini-2.5-flash';
+  const model = 'gemini-flash-lite-latest';
 
   const judgePrompt = `
     SYSTEM ROLE:
@@ -1060,8 +1209,18 @@ export async function runAndEvaluateTestCase(testCase: TestCase, onProgress: (me
     
     try {
         trajectory.push(`[USER PROMPT] -> ${testCase.userPrompt}`);
+        
+        const defaultSettings = {
+            format: 'video' as Format,
+            aspectRatio: '16:9' as AspectRatio,
+            imageQuality: '1080p' as ImageQuality,
+            videoQuality: '720p' as VideoQuality,
+            voiceStyle: 'professional' as VoiceStyle,
+            language: 'en-US' as Language,
+            targetDuration: 'short' as TargetDuration,
+        };
 
-        const { response, toolResult } = await getAgentFirstResponse(testCase.userPrompt, [], (msg) => {
+        const { response, toolResult } = await getAgentFirstResponse(testCase.userPrompt, [], defaultSettings, (msg) => {
             onProgress(msg);
             trajectory.push(`[AGENT STEP] -> ${msg}`);
         });

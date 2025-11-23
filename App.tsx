@@ -3,13 +3,21 @@ import { Header } from './components/Header';
 import { PromptBar } from './components/PromptBar';
 import { ControlPlane } from './components/ControlPlane';
 import { generateCreativeConcepts, generateFinalAsset } from './services/geminiService';
-import { type GeneratedCampaign, type AspectRatio, type Format, type ImageQuality, type VideoQuality, type CreativeConcept, type AiResponse, AiResponseType, type VoiceStyle, type Language, ObservabilityMetrics, UiComponent, UiComponentType } from './types';
+import { type GeneratedCampaign, type AspectRatio, type Format, type ImageQuality, type VideoQuality, type CreativeConcept, type AiResponse, AiResponseType, type VoiceStyle, type Language, ObservabilityMetrics, UiComponent, UiComponentType, type TargetDuration } from './types';
 import { ApiKeySelector } from './components/ApiKeySelector';
 import { LoadingExperience } from './components/LoadingExperience';
 import { GoldenDatasetTester } from './components/GoldenDatasetTester';
 import { AgentOpsDashboard } from './components/AgentOpsDashboard';
 import { MemoryConfirmationModal } from './components/MemoryConfirmationModal';
 import { UserProfileModal } from './components/UserProfileModal';
+import { SettingsModal } from './components/SettingsModal';
+import { AppBackground } from './components/CreativeShowcase';
+import { useTheme } from './contexts/ThemeContext';
+import { SessionSidebar } from './components/SessionSidebar';
+import { ContentReel } from './components/ContentReel';
+import { MOCK_SESSIONS } from './constants';
+
+export type AppView = 'creator' | 'browse' | 'tester' | 'ops';
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -20,7 +28,11 @@ const App: React.FC = () => {
   const [generatedCampaigns, setGeneratedCampaigns] = useState<GeneratedCampaign[]>([]);
   
   const [hasApiKey, setHasApiKey] = useState<boolean>(false);
-  const [view, setView] = useState<'creator' | 'tester' | 'ops'>('creator');
+  const [view, setView] = useState<AppView>('creator');
+  
+  const [sessions, setSessions] = useState(MOCK_SESSIONS);
+  const [activeSessionId, setActiveSessionId] = useState(MOCK_SESSIONS[0]?.id || null);
+
 
   // Memory Protocol State
   const [sessionHistory, setSessionHistory] = useState<CreativeConcept[]>([]);
@@ -28,6 +40,9 @@ const App: React.FC = () => {
   const [memoryPattern, setMemoryPattern] = useState<{ style: string } | null>(null);
   const [pendingConcept, setPendingConcept] = useState<CreativeConcept | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
+
+  const { showcaseStyle } = useTheme();
 
 
   // Store generation settings to use them in the second stage
@@ -38,6 +53,8 @@ const App: React.FC = () => {
     videoQuality: VideoQuality;
     voiceStyle: VoiceStyle;
     language: Language;
+    targetDuration: TargetDuration;
+    uploadedImage?: { data: string, mimeType: string };
   } | null>(null);
   
   useEffect(() => {
@@ -71,18 +88,22 @@ const App: React.FC = () => {
     videoQuality: VideoQuality,
     voiceStyle: VoiceStyle,
     language: Language,
+    targetDuration: TargetDuration,
+    uploadedImage?: { data: string, mimeType: string }
   ) => {
-    if (!prompt.trim() || !hasApiKey) return;
+    if (!prompt.trim() && !uploadedImage || !hasApiKey) return;
     
     try {
       setIsLoading(true);
       setAiResponse(null);
       setGeneratedCampaigns([]);
       setUiComponents([]);
-      setGenerationSettings({ aspectRatio, format, imageQuality, videoQuality, voiceStyle, language });
+      
+      const settings = { aspectRatio, format, imageQuality, videoQuality, voiceStyle, language, targetDuration, uploadedImage };
+      setGenerationSettings(settings);
 
       setLoadingMessage('Initializing agent...');
-      const result = await generateCreativeConcepts(prompt, sessionHistory, (msg) => setLoadingMessage(msg));
+      const result = await generateCreativeConcepts(prompt, sessionHistory, settings, (msg) => setLoadingMessage(msg), uploadedImage);
 
       if ('uiComponents' in result) {
         setUiComponents(result.uiComponents);
@@ -112,7 +133,7 @@ const App: React.FC = () => {
       setAiResponse(null);
       setUiComponents([]); // Clear concepts to show loading for the final asset
 
-      const { format, aspectRatio, imageQuality, videoQuality, voiceStyle, language } = generationSettings;
+      const { format, aspectRatio, imageQuality, videoQuality, voiceStyle, language, uploadedImage } = generationSettings;
       
       const result = await generateFinalAsset(
         concept,
@@ -123,7 +144,8 @@ const App: React.FC = () => {
         voiceStyle,
         language,
         memoryStatus,
-        setLoadingMessage
+        setLoadingMessage,
+        uploadedImage
       );
       
       if ('aiResponseType' in result) {
@@ -195,15 +217,47 @@ const App: React.FC = () => {
     setUiComponents([]);
     setGenerationSettings(null);
     setSessionHistory([]);
+    const newSessionId = `session_${Date.now()}`;
+    setSessions(prev => [{ id: newSessionId, title: 'New Session', date: 'Today'}, ...prev]);
+    setActiveSessionId(newSessionId);
     setView('creator');
   };
+  
+  const handleOpenSession = (sessionId: string) => {
+      setActiveSessionId(sessionId);
+      // In a real app, you would fetch the data for this session
+      // For now, we just reset the view
+      setIsLoading(false);
+      setAiResponse(null);
+      setGeneratedCampaigns([]);
+      setUiComponents([]);
+      setGenerationSettings(null);
+      setSessionHistory([]);
+  };
+
+  const handleDeleteSession = (sessionId: string) => {
+      setSessions(prev => prev.filter(s => s.id !== sessionId));
+      if (activeSessionId === sessionId) {
+          // If the active session is deleted, activate the next one or reset
+          const newActiveId = sessions.length > 1 ? sessions.find(s => s.id !== sessionId)?.id : null;
+          setActiveSessionId(newActiveId);
+          handleReset();
+      }
+  };
+  
+  const handleDeleteCampaign = (campaignId: string | number) => {
+      setGeneratedCampaigns(prev => prev.filter(c => c.id !== campaignId));
+  };
+
 
   const renderView = () => {
     switch(view) {
+      case 'browse':
+        return <ContentReel campaigns={generatedCampaigns} />;
       case 'tester':
         return <GoldenDatasetTester />;
       case 'ops':
-        return <AgentOpsDashboard />;
+        return <AgentOpsDashboard uiComponents={uiComponents} />;
       case 'creator':
       default:
         return (
@@ -215,6 +269,8 @@ const App: React.FC = () => {
                 campaigns={generatedCampaigns} 
                 uiComponents={uiComponents}
                 onSelectConcept={handleConceptSelect}
+                onDeleteCampaign={handleDeleteCampaign}
+                format={generationSettings?.format}
               />
             )}
           </>
@@ -226,52 +282,72 @@ const App: React.FC = () => {
     return <ApiKeySelector onSelectKey={handleSelectKey} />;
   }
 
-  const hasContent = generatedCampaigns.length > 0 || uiComponents.length > 0;
-
   return (
-    <div className="min-h-screen bg-transparent text-[var(--color-text-primary)] flex flex-col p-4 sm:p-6 lg:p-8">
-      <Header 
-        onReset={handleReset} 
-        hasContent={hasContent} 
-        currentView={view} 
-        onSetView={setView} 
-        onOpenProfile={() => setIsProfileModalOpen(true)}
-      />
-      <main className="w-full max-w-7xl mx-auto flex-grow flex flex-col mt-4">
-        {aiResponse && (
-          <div 
-            className={`border text-white px-4 py-3 rounded-lg relative my-4 max-w-3xl mx-auto ${
-              aiResponse.type === AiResponseType.ERROR ? 'bg-red-800/50 border-red-600' : 'bg-sky-800/50 border-sky-600'
-            }`} 
-            role="alert"
-          >
-            <strong>
-              {aiResponse.type === AiResponseType.ERROR ? 'Error' : 
-               aiResponse.type === AiResponseType.REFUSAL ? 'Request Refused' :
-               'Clarification Needed'}
-               :
-            </strong> {aiResponse.message}
-          </div>
-        )}
-        
-        {renderView()}
+    <>
+      <AppBackground view={view} showcaseStyle={showcaseStyle} />
+      <div className="min-h-screen bg-transparent text-[var(--color-text-primary)] flex flex-col p-4 sm:p-6 lg:p-8 relative z-10">
+        <Header 
+          currentView={view} 
+          onSetView={setView}
+          onOpenProfile={() => setIsProfileModalOpen(true)}
+          onOpenSettings={() => setIsSettingsModalOpen(true)}
+        />
 
-      </main>
-      {showMemoryModal && memoryPattern && (
-        <MemoryConfirmationModal
-          pattern={memoryPattern}
-          onConfirm={handleConfirmSaveMemory}
-          onDecline={handleDeclineSaveMemory}
-        />
-      )}
-      {isProfileModalOpen && (
-        <UserProfileModal
-            sessionHistory={sessionHistory}
-            onClose={() => setIsProfileModalOpen(false)}
-        />
-      )}
-      {view === 'creator' && <PromptBar onGenerate={handleGenerateConcepts} isLoading={isLoading} />}
-    </div>
+        <div className={`w-full max-w-7xl mx-auto flex-grow flex flex-row mt-4 gap-6 ${view !== 'creator' ? 'justify-center' : ''}`}>
+          {view === 'creator' && (
+            <SessionSidebar 
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              onNewSession={handleReset} 
+              onOpenSession={handleOpenSession}
+              onDeleteSession={handleDeleteSession}
+            />
+          )}
+          
+          <main className="flex-1 flex flex-col min-w-0">
+            {aiResponse && (
+              <div 
+                className={`border text-white px-4 py-3 rounded-lg relative mb-4 ${
+                  aiResponse.type === AiResponseType.ERROR ? 'bg-red-800/50 border-red-600' : 'bg-sky-800/50 border-sky-600'
+                }`} 
+                role="alert"
+              >
+                <strong>
+                  {aiResponse.type === AiResponseType.ERROR ? 'Error' : 
+                  aiResponse.type === AiResponseType.REFUSAL ? 'Request Refused' :
+                  'Clarification Needed'}
+                  :
+                </strong> {aiResponse.message}
+              </div>
+            )}
+            
+            {renderView()}
+
+            {view === 'creator' && <PromptBar onGenerate={handleGenerateConcepts} isLoading={isLoading} />}
+          </main>
+        </div>
+        
+        {showMemoryModal && memoryPattern && (
+          <MemoryConfirmationModal
+            pattern={memoryPattern}
+            onConfirm={handleConfirmSaveMemory}
+            onDecline={handleDeclineSaveMemory}
+          />
+        )}
+        {isProfileModalOpen && (
+          <UserProfileModal
+              sessionHistory={sessionHistory}
+              onClose={() => setIsProfileModalOpen(false)}
+          />
+        )}
+        {isSettingsModalOpen && (
+          <SettingsModal
+              onSetView={setView}
+              onClose={() => setIsSettingsModalOpen(false)}
+          />
+        )}
+      </div>
+    </>
   );
 };
 

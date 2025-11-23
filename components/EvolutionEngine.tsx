@@ -79,10 +79,12 @@ const AutomatedRag: React.FC = () => (
             </div>
         </div>
         <div className="flex justify-end gap-4 mt-4">
-            <button className="px-4 py-2 rounded-lg bg-[var(--color-background-tertiary)] hover:bg-[var(--color-border-primary)] text-[var(--color-text-primary)] font-semibold transition-colors text-sm">
+            <button className="px-4 py-2 rounded-lg bg-red-700/80 hover:bg-red-600/80 text-white font-semibold transition-colors text-sm flex items-center gap-2">
+                <Icon path="M6 18L18 6M6 6l12 12" className="w-5 h-5" />
                 Reject Draft
             </button>
-            <button className="px-4 py-2 rounded-lg bg-green-600/80 hover:bg-green-500/80 text-white font-bold transition-opacity text-sm">
+            <button className="px-4 py-2 rounded-lg bg-green-600/80 hover:bg-green-500/80 text-white font-bold transition-opacity text-sm flex items-center gap-2">
+                <Icon path="M9 12.75L11.25 15 15 9.75" className="w-5 h-5" />
                 Approve & Add to RAG
             </button>
         </div>

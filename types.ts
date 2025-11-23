@@ -1,6 +1,7 @@
 
 
 
+
 export interface CreativeConcept {
   id: string | number;
   title: string;
@@ -73,6 +74,9 @@ export type ImageQuality = "720p" | "1080p" | "1440p" | "2160p";
 export type VideoQuality = "720p" | "1080p" | "1440p" | "2160p";
 export type VoiceStyle = "professional" | "energetic" | "calm";
 export type Language = "en-US" | "en-GB" | "es-ES" | "fr-FR";
+export type TargetDuration = "short" | "medium" | "long" | "feature";
+export type ShowcaseStyle = 'fluid' | 'grid' | 'doodle' | 'vintage';
+
 
 // AgentOps Dashboard Types
 export interface OperationalMetrics {

@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { MetricCard } from './MetricCard';
-import { type OperationalMetrics, type QualityMetrics } from '../types';
+import { type OperationalMetrics, type QualityMetrics, type UiComponent } from '../types';
 import { CiCdPipeline } from './CiCdPipeline';
 import { EvolutionEngine } from './EvolutionEngine';
 import { ArchitectureBlueprint } from './ArchitectureBlueprint';
+import { ControlPlanViewer } from './ControlPlanViewer';
 
 const mockOperationalMetrics: OperationalMetrics = {
-  tokenConsumption: { value: 4892, unit: 'tokens' },
-  toolLatency: { value: 876, unit: 'ms' },
-  errorRate: { value: 1.2, unit: '%' },
-  totalCost: { value: 0.78, unit: 'USD' },
+  tokenConsumption: { value: 3250, unit: 'tokens' },
+  toolLatency: { value: 650, unit: 'ms' },
+  errorRate: { value: 1.1, unit: '%' },
+  totalCost: { value: 0.45, unit: 'USD' },
 };
 
 const mockQualityMetrics: QualityMetrics = {
@@ -19,9 +20,12 @@ const mockQualityMetrics: QualityMetrics = {
   correctionRate: { value: 8.9, unit: '%' },
 };
 
+interface AgentOpsDashboardProps {
+  uiComponents: UiComponent[];
+}
 
-export const AgentOpsDashboard: React.FC = () => {
-    const [view, setView] = useState<'operational' | 'quality' | 'deployments' | 'evolution' | 'architecture'>('architecture');
+export const AgentOpsDashboard: React.FC<AgentOpsDashboardProps> = ({ uiComponents }) => {
+    const [view, setView] = useState<'control_plan' | 'architecture' | 'operational' | 'quality' | 'deployments' | 'evolution'>('control_plan');
 
   const getButtonClass = (buttonView: typeof view) => {
     return `px-4 py-2 text-sm font-semibold rounded-md transition-colors ${view === buttonView ? 'bg-[var(--color-primary)] text-white' : 'hover:bg-[var(--color-background-tertiary)]'}`;
@@ -38,6 +42,9 @@ export const AgentOpsDashboard: React.FC = () => {
 
       <div className="flex justify-center mb-8">
         <div className="bg-[var(--color-background-secondary)]/60 border border-[var(--color-border-primary)] rounded-lg p-1 flex items-center gap-2 flex-wrap">
+            <button onClick={() => setView('control_plan')} className={getButtonClass('control_plan')}>
+                Control Plan
+            </button>
             <button onClick={() => setView('architecture')} className={getButtonClass('architecture')}>
                 Architecture
             </button>
@@ -55,6 +62,10 @@ export const AgentOpsDashboard: React.FC = () => {
             </button>
         </div>
       </div>
+
+      {view === 'control_plan' && (
+        <ControlPlanViewer uiComponents={uiComponents} />
+      )}
 
       {view === 'architecture' && (
         <ArchitectureBlueprint />
@@ -84,7 +95,7 @@ export const AgentOpsDashboard: React.FC = () => {
                 title="Cost per Session"
                 value={mockOperationalMetrics.totalCost.value}
                 unit={mockOperationalMetrics.totalCost.unit}
-                iconPath="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-15c-.621 0-1.125-.504-1.125-1.125v-9.75c0-.621.504-1.125 1.125-1.125h1.5"
+                iconPath="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125-1.125h-15c-.621 0-1.125-.504-1.125-1.125v-9.75c0-.621.504-1.125 1.125-1.125h1.5"
             />
          </div>
       )}
