@@ -1,23 +1,34 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { PromptBar } from './components/PromptBar';
-import { MediaCanvas } from './components/ImageCanvas';
+import { ControlPlane } from './components/ControlPlane';
 import { generateCreativeConcepts, generateFinalAsset } from './services/geminiService';
-import { type GeneratedCampaign, type AspectRatio, type Format, type ImageQuality, type VideoQuality, type CreativeConcept, type AiResponse, AiResponseType } from './types';
+import { type GeneratedCampaign, type AspectRatio, type Format, type ImageQuality, type VideoQuality, type CreativeConcept, type AiResponse, AiResponseType, type VoiceStyle, type Language, ObservabilityMetrics, UiComponent, UiComponentType } from './types';
 import { ApiKeySelector } from './components/ApiKeySelector';
 import { LoadingExperience } from './components/LoadingExperience';
 import { GoldenDatasetTester } from './components/GoldenDatasetTester';
+import { AgentOpsDashboard } from './components/AgentOpsDashboard';
+import { MemoryConfirmationModal } from './components/MemoryConfirmationModal';
+import { UserProfileModal } from './components/UserProfileModal';
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadingMessage, setLoadingMessage] = useState<string>('');
   const [aiResponse, setAiResponse] = useState<AiResponse | null>(null);
   
-  const [concepts, setConcepts] = useState<CreativeConcept[]>([]);
+  const [uiComponents, setUiComponents] = useState<UiComponent[]>([]);
   const [generatedCampaigns, setGeneratedCampaigns] = useState<GeneratedCampaign[]>([]);
   
   const [hasApiKey, setHasApiKey] = useState<boolean>(false);
-  const [view, setView] = useState<'creator' | 'tester'>('creator');
+  const [view, setView] = useState<'creator' | 'tester' | 'ops'>('creator');
+
+  // Memory Protocol State
+  const [sessionHistory, setSessionHistory] = useState<CreativeConcept[]>([]);
+  const [showMemoryModal, setShowMemoryModal] = useState<boolean>(false);
+  const [memoryPattern, setMemoryPattern] = useState<{ style: string } | null>(null);
+  const [pendingConcept, setPendingConcept] = useState<CreativeConcept | null>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+
 
   // Store generation settings to use them in the second stage
   const [generationSettings, setGenerationSettings] = useState<{
@@ -25,6 +36,8 @@ const App: React.FC = () => {
     format: Format;
     imageQuality: ImageQuality;
     videoQuality: VideoQuality;
+    voiceStyle: VoiceStyle;
+    language: Language;
   } | null>(null);
   
   useEffect(() => {
@@ -39,7 +52,10 @@ const App: React.FC = () => {
   const handleError = (error: unknown) => {
     console.error(error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    if (errorMessage.includes("entity was not found")) {
+    
+    if (errorMessage.includes("[UNRECOVERABLE]")) {
+        setAiResponse({ type: AiResponseType.ERROR, message: `The agent failed to generate the asset after multiple recovery attempts. Please try a different prompt or adjust your settings. Final error: ${errorMessage}` });
+    } else if (errorMessage.includes("entity was not found")) {
       setAiResponse({ type: AiResponseType.ERROR, message: "Your API key is invalid. Please select a valid key from a paid project to continue." });
       setHasApiKey(false);
     } else {
@@ -53,6 +69,8 @@ const App: React.FC = () => {
     format: Format,
     imageQuality: ImageQuality,
     videoQuality: VideoQuality,
+    voiceStyle: VoiceStyle,
+    language: Language,
   ) => {
     if (!prompt.trim() || !hasApiKey) return;
     
@@ -60,19 +78,19 @@ const App: React.FC = () => {
       setIsLoading(true);
       setAiResponse(null);
       setGeneratedCampaigns([]);
-      setConcepts([]);
-      setGenerationSettings({ aspectRatio, format, imageQuality, videoQuality });
+      setUiComponents([]);
+      setGenerationSettings({ aspectRatio, format, imageQuality, videoQuality, voiceStyle, language });
 
-      setLoadingMessage('Generating creative concepts...');
-      const result = await generateCreativeConcepts(prompt, (msg) => setLoadingMessage(msg));
+      setLoadingMessage('Initializing agent...');
+      const result = await generateCreativeConcepts(prompt, sessionHistory, (msg) => setLoadingMessage(msg));
 
-      if ('aiResponseType' in result) {
+      if ('uiComponents' in result) {
+        setUiComponents(result.uiComponents);
+      } else {
         setAiResponse({
           type: result.aiResponseType === 'refusal' ? AiResponseType.REFUSAL : AiResponseType.CLARIFICATION,
           message: result.message
         });
-      } else {
-        setConcepts(result);
       }
       
     } catch (e) {
@@ -81,9 +99,9 @@ const App: React.FC = () => {
       setIsLoading(false);
       setLoadingMessage('');
     }
-  }, [hasApiKey]);
+  }, [hasApiKey, sessionHistory]);
 
-  const handleConceptSelect = useCallback(async (concept: CreativeConcept) => {
+  const executeGeneration = useCallback(async (concept: CreativeConcept, memoryStatus: ObservabilityMetrics['memoryStatus']) => {
     if (!generationSettings) {
       setAiResponse({ type: AiResponseType.ERROR, message: "Generation settings are missing. Please start a new project."});
       return;
@@ -92,9 +110,9 @@ const App: React.FC = () => {
     try {
       setIsLoading(true);
       setAiResponse(null);
-      setConcepts([]); // Clear concepts to show loading for the final asset
+      setUiComponents([]); // Clear concepts to show loading for the final asset
 
-      const { format, aspectRatio, imageQuality, videoQuality } = generationSettings;
+      const { format, aspectRatio, imageQuality, videoQuality, voiceStyle, language } = generationSettings;
       
       const result = await generateFinalAsset(
         concept,
@@ -102,6 +120,9 @@ const App: React.FC = () => {
         aspectRatio,
         imageQuality,
         videoQuality,
+        voiceStyle,
+        language,
+        memoryStatus,
         setLoadingMessage
       );
       
@@ -114,7 +135,6 @@ const App: React.FC = () => {
         setGeneratedCampaigns([result]);
       }
 
-
     } catch (e) {
       handleError(e);
     } finally {
@@ -123,24 +143,100 @@ const App: React.FC = () => {
     }
   }, [generationSettings]);
 
+  const handleConceptSelect = useCallback(async (concept: CreativeConcept) => {
+    const updatedHistory = [...sessionHistory, concept];
+    setSessionHistory(updatedHistory);
+
+    const styleCounts = updatedHistory.reduce((acc, c) => {
+        acc[c.style] = (acc[c.style] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+
+    const newPatternStyle = Object.keys(styleCounts).find(style => styleCounts[style] === 3);
+
+    if (newPatternStyle) {
+        setMemoryPattern({ style: newPatternStyle });
+        setPendingConcept(concept);
+        setShowMemoryModal(true);
+        return; // Pause execution until user responds
+    }
+
+    await executeGeneration(concept, 'preference_logged');
+  }, [sessionHistory, executeGeneration]);
+  
+  const handleConfirmSaveMemory = async () => {
+    if (memoryPattern && pendingConcept) {
+        console.log("SIMULATING: Saving pattern to permanent profile:", memoryPattern);
+        // In a real app, you would call a service here:
+        // await confirmAndSaveProfile({ pattern_type: 'style', pattern_value: memoryPattern.style });
+    }
+    setShowMemoryModal(false);
+    if (pendingConcept) {
+        await executeGeneration(pendingConcept, 'confirmation_triggered');
+    }
+    setMemoryPattern(null);
+    setPendingConcept(null);
+  };
+
+  const handleDeclineSaveMemory = async () => {
+      setShowMemoryModal(false);
+      if (pendingConcept) {
+          await executeGeneration(pendingConcept, 'confirmation_triggered');
+      }
+      setMemoryPattern(null);
+      setPendingConcept(null);
+  };
+
+
   const handleReset = () => {
     setIsLoading(false);
     setAiResponse(null);
     setGeneratedCampaigns([]);
-    setConcepts([]);
+    setUiComponents([]);
     setGenerationSettings(null);
+    setSessionHistory([]);
     setView('creator');
   };
+
+  const renderView = () => {
+    switch(view) {
+      case 'tester':
+        return <GoldenDatasetTester />;
+      case 'ops':
+        return <AgentOpsDashboard />;
+      case 'creator':
+      default:
+        return (
+          <>
+            {isLoading && uiComponents.length === 0 && generatedCampaigns.length === 0 ? (
+              <LoadingExperience message={loadingMessage} />
+            ) : (
+              <ControlPlane 
+                campaigns={generatedCampaigns} 
+                uiComponents={uiComponents}
+                onSelectConcept={handleConceptSelect}
+              />
+            )}
+          </>
+        );
+    }
+  }
 
   if (!hasApiKey) {
     return <ApiKeySelector onSelectKey={handleSelectKey} />;
   }
 
-  const hasContent = generatedCampaigns.length > 0 || concepts.length > 0;
+  const hasContent = generatedCampaigns.length > 0 || uiComponents.length > 0;
 
   return (
-    <div className="min-h-screen bg-transparent text-white flex flex-col p-4 sm:p-6 lg:p-8">
-      <Header onReset={handleReset} hasContent={hasContent} currentView={view} onSetView={setView} />
+    <div className="min-h-screen bg-transparent text-[var(--color-text-primary)] flex flex-col p-4 sm:p-6 lg:p-8">
+      <Header 
+        onReset={handleReset} 
+        hasContent={hasContent} 
+        currentView={view} 
+        onSetView={setView} 
+        onOpenProfile={() => setIsProfileModalOpen(true)}
+      />
       <main className="w-full max-w-7xl mx-auto flex-grow flex flex-col mt-4">
         {aiResponse && (
           <div 
@@ -158,25 +254,22 @@ const App: React.FC = () => {
           </div>
         )}
         
-        {view === 'creator' && (
-          <>
-            {isLoading && concepts.length === 0 ? (
-              <LoadingExperience message={loadingMessage} />
-            ) : (
-              <MediaCanvas 
-                campaigns={generatedCampaigns} 
-                concepts={concepts}
-                onSelectConcept={handleConceptSelect}
-              />
-            )}
-          </>
-        )}
-        
-        {view === 'tester' && (
-          <GoldenDatasetTester />
-        )}
+        {renderView()}
 
       </main>
+      {showMemoryModal && memoryPattern && (
+        <MemoryConfirmationModal
+          pattern={memoryPattern}
+          onConfirm={handleConfirmSaveMemory}
+          onDecline={handleDeclineSaveMemory}
+        />
+      )}
+      {isProfileModalOpen && (
+        <UserProfileModal
+            sessionHistory={sessionHistory}
+            onClose={() => setIsProfileModalOpen(false)}
+        />
+      )}
       {view === 'creator' && <PromptBar onGenerate={handleGenerateConcepts} isLoading={isLoading} />}
     </div>
   );

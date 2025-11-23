@@ -22,7 +22,7 @@ export const LoadingExperience: React.FC<LoadingExperienceProps> = ({ message })
 
   return (
     <div className="flex flex-col items-center justify-center p-8 text-center m-auto">
-      <div className="w-16 h-16 border-4 border-fuchsia-400 border-t-transparent rounded-full animate-spin"></div>
+      <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
       <p className="mt-6 text-xl font-semibold text-gray-200">{message || 'Processing your request...'}</p>
       <p className="mt-2 text-md text-gray-400">{dynamicMessage}</p>
     </div>

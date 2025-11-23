@@ -1,10 +1,16 @@
+
+
+
 export interface CreativeConcept {
-  id: number;
+  id: string | number;
   title: string;
   description: string;
   style: string;
   image_prompt: string;
   video_prompt?: string;
+  voiceover_prompt?: string;
+  duration_seconds?: number;
+  evaluation?: EvaluationScore;
 }
 
 export interface GeneratedAssets {
@@ -13,16 +19,24 @@ export interface GeneratedAssets {
   voiceover: string;
 }
 
+export interface ObservabilityMetrics {
+  complianceScore: number;
+  toolFailoverUsed: boolean;
+  memoryStatus: 'not_triggered' | 'preference_logged' | 'confirmation_triggered';
+  retries: number;
+}
+
 export interface GeneratedCampaign extends CreativeConcept {
   mediaUrl: string;
   format: Format;
+  observability: ObservabilityMetrics;
 }
 
 export type BrandGuidelines = string[];
 
 export interface TestCase {
   caseId: string;
-  type: 'Happy Path' | 'Ambiguity' | 'Adversarial' | 'Contextual';
+  category: 'Effectiveness' | 'Safety & Alignment' | 'Robustness' | 'Efficiency';
   scenario: string;
   userPrompt: string;
   expectedBehavior: string;
@@ -54,6 +68,52 @@ export interface AiResponse {
 }
 
 export type AspectRatio = "16:9" | "1:1" | "9:16";
-export type Format = "image" | "video";
-export type ImageQuality = "1K" | "2K" | "4K";
-export type VideoQuality = "720p" | "1080p";
+export type Format = "image" | "video" | "voiceover";
+export type ImageQuality = "720p" | "1080p" | "1440p" | "2160p";
+export type VideoQuality = "720p" | "1080p" | "1440p" | "2160p";
+export type VoiceStyle = "professional" | "energetic" | "calm";
+export type Language = "en-US" | "en-GB" | "es-ES" | "fr-FR";
+
+// AgentOps Dashboard Types
+export interface OperationalMetrics {
+  tokenConsumption: { value: number; unit: 'tokens'; };
+  toolLatency: { value: number; unit: 'ms'; };
+  errorRate: { value: number; unit: '%'; };
+  totalCost: { value: number; unit: 'USD'; };
+}
+
+export interface QualityMetrics {
+  guardrailTriggerRate: { value: number; unit: '%'; };
+  ragHitRate: { value: number; unit: '%'; };
+  userFeedbackScore: { value: number; unit: '/5'; };
+  correctionRate: { value: number; unit: '%'; };
+}
+
+// A2UI (Agent-to-User-Interface) Protocol Types
+export enum UiComponentType {
+    SELECTION_CARD = 'SelectionCard',
+    ASYNC_STATUS_BAR = 'AsyncStatusBar',
+    PERMISSION_TOGGLE = 'PermissionToggle',
+    SYSTEM_ALERT = 'SystemAlert',
+}
+
+export interface A2AStatus {
+    service: string;
+    status: string;
+    identity_verified: boolean;
+}
+
+export interface ComponentData {
+    status?: 'APPROVED' | 'PENDING' | 'BLOCKED' | 'IN_PROGRESS' | 'COMPLETE' | 'FAILED';
+    message?: string;
+    job_id?: string;
+    concepts?: CreativeConcept[];
+    pattern_to_save?: string;
+    reason?: string; // For SystemAlert
+}
+
+export interface UiComponent {
+    component_type: UiComponentType;
+    component_data: ComponentData;
+    a2a_status?: A2AStatus[];
+}
