@@ -11,7 +11,7 @@ import { AgentOpsDashboard } from './components/AgentOpsDashboard';
 import { MemoryConfirmationModal } from './components/MemoryConfirmationModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { SettingsModal } from './components/SettingsModal';
-import { AppBackground } from './components/CreativeShowcase';
+import { AppBackground } from './components/AppBackground';
 import { useTheme } from './contexts/ThemeContext';
 import { SessionSidebar } from './components/SessionSidebar';
 import { ContentReel } from './components/ContentReel';
@@ -19,7 +19,7 @@ import { MOCK_SESSIONS } from './constants';
 
 export type AppView = 'creator' | 'browse' | 'tester' | 'ops';
 
-const App: React.FC = () => {
+export const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadingMessage, setLoadingMessage] = useState<string>('');
   const [aiResponse, setAiResponse] = useState<AiResponse | null>(null);
@@ -350,5 +350,3 @@ const App: React.FC = () => {
     </>
   );
 };
-
-export default App;

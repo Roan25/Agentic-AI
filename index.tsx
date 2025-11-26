@@ -1,7 +1,9 @@
 
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
+// FIX: Use a named import for the App component as it is not a default export.
+import { App } from './App';
 import { ThemeProvider } from './contexts/ThemeContext';
 
 const rootElement = document.getElementById('root');

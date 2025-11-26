@@ -6,7 +6,15 @@ interface StatusBarProps {
     component: UiComponent;
 }
 
-const statusConfig = {
+// FIX: Define a type for status configurations to include the optional 'animate' property, resolving a TypeScript error.
+type StatusConfigValue = {
+    icon: string;
+    color: string;
+    bgColor: string;
+    animate?: string;
+};
+
+const statusConfig: Record<string, StatusConfigValue> = {
     PENDING: {
         icon: 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z',
         color: 'text-gray-400',
