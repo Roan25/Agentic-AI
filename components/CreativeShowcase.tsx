@@ -1,6 +1,6 @@
 import React from 'react';
 import { ShowcaseStyle } from '../types';
-import { AppView } from '../App';
+import { type AppView } from '../App';
 
 interface AppBackgroundProps {
     view: AppView;

@@ -1,7 +1,4 @@
 
-
-
-
 export interface CreativeConcept {
   id: string | number;
   title: string;
@@ -12,6 +9,8 @@ export interface CreativeConcept {
   voiceover_prompt?: string;
   duration_seconds?: number;
   evaluation?: EvaluationScore;
+  score?: number; // Backend Judge Score
+  script?: string;
 }
 
 export interface GeneratedAssets {
@@ -31,6 +30,8 @@ export interface GeneratedCampaign extends CreativeConcept {
   mediaUrl: string;
   format: Format;
   observability: ObservabilityMetrics;
+  jobId?: string;
+  status?: 'processing' | 'complete' | 'FAILED';
 }
 
 export type BrandGuidelines = string[];
@@ -99,6 +100,7 @@ export enum UiComponentType {
     ASYNC_STATUS_BAR = 'AsyncStatusBar',
     PERMISSION_TOGGLE = 'PermissionToggle',
     SYSTEM_ALERT = 'SystemAlert',
+    TEXT = 'Text' // Added for text bubbles
 }
 
 export interface A2AStatus {
@@ -112,12 +114,31 @@ export interface ComponentData {
     message?: string;
     job_id?: string;
     concepts?: CreativeConcept[];
-    pattern_to_save?: string;
+    pattern_to_save?: { style: string };
     reason?: string; // For SystemAlert
+    [key: string]: any;
 }
 
 export interface UiComponent {
-    component_type: UiComponentType;
+    component_type: UiComponentType | string;
     component_data: ComponentData;
     a2a_status?: A2AStatus[];
+}
+
+// Strict contract for the Agent API
+export type A2UIPayload = UiComponent;
+
+export interface AgentWorkflowRequest {
+    prompt: string;
+    session_history?: CreativeConcept[];
+    settings?: {
+        format: Format;
+        aspectRatio: AspectRatio;
+        imageQuality: ImageQuality;
+        videoQuality: VideoQuality;
+        voiceStyle: VoiceStyle;
+        language: Language;
+        targetDuration: TargetDuration;
+    };
+    uploadedImage?: { data: string; mimeType: string };
 }

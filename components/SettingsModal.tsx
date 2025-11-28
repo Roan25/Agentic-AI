@@ -2,7 +2,7 @@ import React from 'react';
 import { Icon } from './Icon';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { ShowcaseStyleSwitcher } from './ShowcaseStyleSwitcher';
-import { AppView } from '../App';
+import { type AppView } from '../App';
 
 interface SettingsModalProps {
   onClose: () => void;

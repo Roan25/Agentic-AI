@@ -90,7 +90,8 @@ export const GoldenDatasetTester: React.FC = () => {
   const handleRunTest = useCallback(async (testCase: TestCase) => {
     setLoadingTestId(testCase.caseId);
     try {
-      const result = await runAndEvaluateTestCase(testCase, setLoadingMessage);
+      // Removing the second argument 'setLoadingMessage' as runAndEvaluateTestCase only accepts testCase
+      const result = await runAndEvaluateTestCase(testCase);
       setTestResults(prev => ({...prev, [testCase.caseId]: result}));
     } catch (error) {
        console.error("Failed to run test case", error);
