@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { type GeneratedCampaign, type CreativeConcept, UiComponent, Format } from '../types';
 import { MediaModal } from './ImageModal';
@@ -14,16 +15,16 @@ interface ControlPlaneProps {
 }
 
 const WelcomeMessage: React.FC = () => (
-  <div className="flex flex-col items-center justify-center h-[60vh] text-center px-4 animate-fade-in">
-    <div className="relative">
-        <div className="absolute -inset-1 rounded-full blur-3xl bg-[var(--color-primary)] opacity-20 animate-pulse"></div>
+  <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4 animate-fade-in mt-10">
+    <div className="relative group">
+        <div className="absolute -inset-1 rounded-full blur-3xl bg-[var(--color-primary)] opacity-20 group-hover:opacity-30 transition-opacity duration-1000 animate-pulse"></div>
         <Icon path="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" className="w-24 h-24 text-[var(--color-text-primary)] relative z-10" />
     </div>
     <h1 className="text-5xl md:text-7xl font-bold mt-8 tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/40 font-heading">
       Create Reality.
     </h1>
-    <p className="text-xl text-[var(--color-text-secondary)] mt-4 max-w-lg font-light">
-      Enter a prompt below to ignite the creative agent.
+    <p className="text-xl text-[var(--color-text-secondary)] mt-4 max-w-lg font-light leading-relaxed">
+      Describe your vision. The agent swarm will handle the rest.
     </p>
   </div>
 );
@@ -33,13 +34,13 @@ const GeneratedMediaItem: React.FC<{ campaign: GeneratedCampaign; onClick: () =>
 
   return (
     <div 
-      className="relative break-inside-avoid mb-6 rounded-2xl overflow-hidden cursor-pointer group border border-transparent hover:border-[var(--color-border-primary)] transition-all bg-[var(--color-background-secondary)]"
+      className="relative break-inside-avoid mb-6 rounded-2xl overflow-hidden cursor-pointer group border border-transparent hover:border-[var(--color-border-primary)] transition-all bg-[var(--color-background-secondary)] shadow-lg hover:shadow-2xl"
       onClick={onClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Media Content */}
-      <div className="w-full relative bg-black/50">
+      <div className="w-full relative bg-black/50 aspect-[16/9] md:aspect-auto">
           {campaign.format === 'image' ? (
             <img
               src={campaign.mediaUrl}
@@ -72,7 +73,7 @@ const GeneratedMediaItem: React.FC<{ campaign: GeneratedCampaign; onClick: () =>
              <p className="text-zinc-300 text-xs mt-1 line-clamp-2">{campaign.description}</p>
              
              <div className="flex items-center justify-between mt-3">
-                 <span className="text-[10px] uppercase tracking-wider font-bold text-[var(--color-text-accent)] bg-black/50 px-2 py-1 rounded backdrop-blur-sm">
+                 <span className="text-[10px] uppercase tracking-wider font-bold text-[var(--color-text-accent)] bg-black/50 px-2 py-1 rounded backdrop-blur-sm border border-white/10">
                     {campaign.format}
                  </span>
                  <button 
@@ -106,9 +107,30 @@ export const ControlPlane: React.FC<ControlPlaneProps> = ({ campaigns, uiCompone
       if (action === 'SELECT_CONCEPT') {
           onSelectConcept(data);
       } else if (action === 'SAVE_MEMORY') {
-          // Trigger the visual "Badge" animation
           setLastSavedMemory(data.pattern_to_save?.style || 'Style Preference');
-          // In a real app, you might also update local session state here
+          // Clear badge after some time or let component handle it
+      } else if (action === 'JOB_COMPLETE') {
+           // If we have a URL from the stream job complete, open it in the modal
+           if (data.url) {
+               // Try to find the campaign in our list first
+               const existingCampaign = campaigns.find(c => c.jobId === data.jobId);
+               if (existingCampaign) {
+                   setSelectedCampaign(existingCampaign);
+               } else {
+                   // Fallback for stream-only jobs (like the initial workflow result)
+                   setSelectedCampaign({
+                       id: data.jobId || 'temp_result',
+                       title: 'Workflow Result',
+                       description: 'Generated output from agent workflow',
+                       style: 'Auto',
+                       image_prompt: '',
+                       mediaUrl: data.url,
+                       format: 'video', 
+                       observability: { complianceScore: 10, toolFailoverUsed: false, memoryStatus: 'not_triggered', retries: 0 },
+                       status: 'complete'
+                   });
+               }
+           }
       }
   };
 
@@ -126,7 +148,7 @@ export const ControlPlane: React.FC<ControlPlaneProps> = ({ campaigns, uiCompone
         )}
 
         {/* 2. Agent Interface Stream (Chat) */}
-        <div className="w-full max-w-5xl mx-auto space-y-6 mb-12">
+        <div className="w-full max-w-5xl mx-auto space-y-8 mb-16">
             {uiComponents.map((component, index) => (
                 <A2UIRenderer 
                     key={index} 
@@ -138,9 +160,12 @@ export const ControlPlane: React.FC<ControlPlaneProps> = ({ campaigns, uiCompone
 
         {/* 3. Generated Campaigns Grid (Masonry) */}
         {campaigns.length > 0 && (
-            <div className="animate-fade-in w-full border-t border-[var(--color-border-primary)] pt-8 mt-8">
-               <div className="flex items-center justify-between mb-8">
-                   <h2 className="text-2xl font-heading font-bold">Generations <span className="text-[var(--color-text-secondary)] text-lg font-normal ml-2">({campaigns.length})</span></h2>
+            <div className="animate-fade-in w-full border-t border-[var(--color-border-primary)] pt-12 mt-12 mb-32">
+               <div className="flex items-center gap-4 mb-8">
+                   <h2 className="text-2xl font-heading font-bold text-[var(--color-text-primary)]">Asset Library</h2>
+                   <div className="px-3 py-1 rounded-full bg-[var(--color-background-secondary)] border border-[var(--color-border-primary)] text-xs font-mono text-[var(--color-text-secondary)]">
+                       {campaigns.length} Generated
+                   </div>
                </div>
                
                <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-6 space-y-6">

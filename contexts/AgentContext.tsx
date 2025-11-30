@@ -9,6 +9,7 @@ interface AgentState {
 
 type AgentAction =
   | { type: 'ADD_MESSAGE'; payload: A2UIPayload }
+  | { type: 'UPSERT_COMPONENT'; payload: A2UIPayload } // New action for streaming
   | { type: 'SET_ACTIVE_COMPONENT'; payload: A2UIPayload | null }
   | { type: 'UPDATE_A2A_MONITOR'; payload: A2AStatus[] }
   | { type: 'CLEAR_HISTORY' };
@@ -21,7 +22,7 @@ const initialState: AgentState = {
 
 const agentReducer = (state: AgentState, action: AgentAction): AgentState => {
   switch (action.type) {
-    case 'ADD_MESSAGE':
+    case 'ADD_MESSAGE': {
       // Also update A2A monitor if the message contains status updates
       const newMonitor = action.payload.a2a_status 
         ? action.payload.a2a_status 
@@ -31,11 +32,40 @@ const agentReducer = (state: AgentState, action: AgentAction): AgentState => {
         ...state,
         history: [...state.history, action.payload],
         a2aMonitor: newMonitor,
-        // If it's an interactive card, set it as active
         activeComponent: ['SelectionCard', 'PermissionToggle'].includes(action.payload.component_type) 
           ? action.payload 
           : state.activeComponent
       };
+    }
+    case 'UPSERT_COMPONENT': {
+        // Look at the last component. If it matches the type, update it. Otherwise add new.
+        // This simulates SSE replacing the current view.
+        const lastIndex = state.history.length - 1;
+        const lastItem = state.history[lastIndex];
+
+        let newHistory = [...state.history];
+        
+        if (lastItem && lastItem.component_type === action.payload.component_type) {
+            // Update the existing component (Streaming effect)
+            newHistory[lastIndex] = action.payload;
+        } else {
+            // It's a new component type entering the stream
+            newHistory.push(action.payload);
+        }
+
+        const newMonitor = action.payload.a2a_status 
+            ? action.payload.a2a_status 
+            : state.a2aMonitor;
+
+        return {
+            ...state,
+            history: newHistory,
+            a2aMonitor: newMonitor,
+            activeComponent: ['SelectionCard', 'PermissionToggle'].includes(action.payload.component_type) 
+                ? action.payload 
+                : state.activeComponent
+        };
+    }
     case 'SET_ACTIVE_COMPONENT':
       return { ...state, activeComponent: action.payload };
     case 'UPDATE_A2A_MONITOR':
@@ -50,6 +80,7 @@ const agentReducer = (state: AgentState, action: AgentAction): AgentState => {
 const AgentContext = createContext<{
   state: AgentState;
   addMessage: (payload: A2UIPayload) => void;
+  upsertComponent: (payload: A2UIPayload) => void;
   clearHistory: () => void;
   setActiveComponent: (component: A2UIPayload | null) => void;
 } | undefined>(undefined);
@@ -61,6 +92,10 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     dispatch({ type: 'ADD_MESSAGE', payload });
   }, []);
 
+  const upsertComponent = useCallback((payload: A2UIPayload) => {
+    dispatch({ type: 'UPSERT_COMPONENT', payload });
+  }, []);
+
   const clearHistory = useCallback(() => {
     dispatch({ type: 'CLEAR_HISTORY' });
   }, []);
@@ -70,7 +105,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   return (
-    <AgentContext.Provider value={{ state, addMessage, clearHistory, setActiveComponent }}>
+    <AgentContext.Provider value={{ state, addMessage, upsertComponent, clearHistory, setActiveComponent }}>
       {children}
     </AgentContext.Provider>
   );

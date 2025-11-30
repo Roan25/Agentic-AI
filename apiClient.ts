@@ -1,3 +1,4 @@
+
 // In a real application, this would point to your deployed backend service.
 const API_BASE_URL = '/api'; // Using a relative URL for proxying in development
 
@@ -43,7 +44,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
         }
 
     } catch (error) {
-        console.error(`API request failed: ${error}`);
+        // console.error(`API request failed: ${error}`); // Suppressed for demo mode
         // Re-throw the error so it can be caught by the calling function's try/catch block
         throw error;
     }

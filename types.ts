@@ -1,4 +1,5 @@
 
+
 export interface CreativeConcept {
   id: string | number;
   title: string;
@@ -110,7 +111,7 @@ export interface A2AStatus {
 }
 
 export interface ComponentData {
-    status?: 'APPROVED' | 'PENDING' | 'BLOCKED' | 'IN_PROGRESS' | 'COMPLETE' | 'FAILED';
+    status?: 'APPROVED' | 'PENDING' | 'BLOCKED' | 'IN_PROGRESS' | 'COMPLETE' | 'FAILED' | 'CONDITIONAL_APPROVAL' | 'MAINTENANCE' | 'STREAMING' | 'READY';
     message?: string;
     job_id?: string;
     concepts?: CreativeConcept[];

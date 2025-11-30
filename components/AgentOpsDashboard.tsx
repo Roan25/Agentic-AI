@@ -5,6 +5,7 @@ import { CiCdPipeline } from './CiCdPipeline';
 import { EvolutionEngine } from './EvolutionEngine';
 import { ArchitectureBlueprint } from './ArchitectureBlueprint';
 import { ControlPlanViewer } from './ControlPlanViewer';
+import { RedTeamLab } from './RedTeamLab';
 
 const mockOperationalMetrics: OperationalMetrics = {
   tokenConsumption: { value: 3250, unit: 'tokens' },
@@ -25,7 +26,7 @@ interface AgentOpsDashboardProps {
 }
 
 export const AgentOpsDashboard: React.FC<AgentOpsDashboardProps> = ({ uiComponents }) => {
-    const [view, setView] = useState<'control_plan' | 'architecture' | 'operational' | 'quality' | 'deployments' | 'evolution'>('control_plan');
+    const [view, setView] = useState<'control_plan' | 'architecture' | 'operational' | 'quality' | 'deployments' | 'evolution' | 'security'>('control_plan');
 
   const getButtonClass = (buttonView: typeof view) => {
     return `px-4 py-2 text-sm font-semibold rounded-md transition-colors ${view === buttonView ? 'bg-[var(--color-primary)] text-white' : 'hover:bg-[var(--color-background-tertiary)]'}`;
@@ -41,12 +42,15 @@ export const AgentOpsDashboard: React.FC<AgentOpsDashboardProps> = ({ uiComponen
       </div>
 
       <div className="flex justify-center mb-8">
-        <div className="bg-[var(--color-background-secondary)]/60 border border-[var(--color-border-primary)] rounded-lg p-1 flex items-center gap-2 flex-wrap">
+        <div className="bg-[var(--color-background-secondary)]/60 border border-[var(--color-border-primary)] rounded-lg p-1 flex items-center gap-2 flex-wrap justify-center">
             <button onClick={() => setView('control_plan')} className={getButtonClass('control_plan')}>
                 Control Plan
             </button>
             <button onClick={() => setView('architecture')} className={getButtonClass('architecture')}>
                 Architecture
+            </button>
+             <button onClick={() => setView('security')} className={getButtonClass('security')}>
+                Security Lab
             </button>
             <button onClick={() => setView('operational')} className={getButtonClass('operational')}>
                 Operational Metrics
@@ -55,10 +59,10 @@ export const AgentOpsDashboard: React.FC<AgentOpsDashboardProps> = ({ uiComponen
                 Quality & Trust
             </button>
              <button onClick={() => setView('deployments')} className={getButtonClass('deployments')}>
-                Deployment Pipeline
+                Deployment
             </button>
              <button onClick={() => setView('evolution')} className={getButtonClass('evolution')}>
-                Evolution Engine
+                Evolution
             </button>
         </div>
       </div>
@@ -69,6 +73,10 @@ export const AgentOpsDashboard: React.FC<AgentOpsDashboardProps> = ({ uiComponen
 
       {view === 'architecture' && (
         <ArchitectureBlueprint />
+      )}
+      
+      {view === 'security' && (
+        <RedTeamLab />
       )}
 
       {view === 'operational' && (

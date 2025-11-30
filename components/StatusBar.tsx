@@ -46,12 +46,24 @@ const statusConfig: Record<string, StatusConfigValue> = {
         borderColor: 'border-rose-900',
         bgColor: 'bg-rose-950/30',
     },
-     APPROVED: {
+    APPROVED: {
         icon: 'M9 12.75L11.25 15 15 9.75',
         color: 'text-emerald-400',
         borderColor: 'border-emerald-900',
         bgColor: 'bg-emerald-950/30',
     },
+    CONDITIONAL_APPROVAL: {
+        icon: 'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z',
+        color: 'text-amber-500',
+        borderColor: 'border-amber-500/50',
+        bgColor: 'bg-amber-950/30',
+    },
+    MAINTENANCE: {
+        icon: 'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z',
+        color: 'text-orange-500',
+        borderColor: 'border-orange-500/50',
+        bgColor: 'bg-orange-950/30',
+    }
 };
 
 export const StatusBar: React.FC<StatusBarProps> = ({ component }) => {

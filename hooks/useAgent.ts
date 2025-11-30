@@ -15,12 +15,13 @@ import {
     type Language, 
     ObservabilityMetrics, 
     UiComponent, 
-    TargetDuration 
+    TargetDuration,
+    A2UIPayload
 } from '../types';
 import { useAgentContext } from '../contexts/AgentContext';
 
 export const useAgent = (sessionHistory: CreativeConcept[], handleResetSession: () => void) => {
-    const { state, addMessage, clearHistory } = useAgentContext();
+    const { state, addMessage, upsertComponent, clearHistory } = useAgentContext();
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [loadingMessage, setLoadingMessage] = useState<string>('');
     const [aiResponse, setAiResponse] = useState<AiResponse | null>(null);
@@ -50,7 +51,7 @@ export const useAgent = (sessionHistory: CreativeConcept[], handleResetSession: 
         try {
             const finalCampaign = await pollForJobCompletion(processingCampaign.jobId);
             setGeneratedCampaigns(prev => 
-                prev.map(c => c.id === processingCampaign.id ? finalCampaign : c)
+                prev.map(c => c.id === processingCampaign.id ? { ...finalCampaign, id: c.id } : c)
             );
         } catch (e) {
             handleError(e);
@@ -85,18 +86,21 @@ export const useAgent = (sessionHistory: CreativeConcept[], handleResetSession: 
 
             setLoadingMessage('Initializing agent workflow...');
             
-            // Execute the Agent Workflow via the Model Router
-            // This expects a stream/list of A2UI payloads
-            const resultPayloads = await AgentApiService.executeAgentWorkflow({
+            // Execute the Agent Workflow via the Model Router with STREAMING
+            await AgentApiService.executeAgentWorkflow({
                 prompt,
                 session_history: sessionHistory,
                 settings,
                 uploadedImage
-            });
-
-            // Dispatch payloads to the Context (Brain)
-            resultPayloads.forEach(payload => {
-                addMessage(payload);
+            }, (payload: A2UIPayload) => {
+                // Handle SSE Stream Updates
+                if (payload.component_type === 'SelectionCard' || payload.component_type === 'AsyncStatusBar') {
+                    // Update the existing component in place (Skeleton -> Data)
+                    upsertComponent(payload);
+                } else {
+                    // Standard message (Text, SystemAlert) - append it
+                    addMessage(payload);
+                }
             });
 
         } catch (e) {
@@ -105,20 +109,26 @@ export const useAgent = (sessionHistory: CreativeConcept[], handleResetSession: 
             setIsLoading(false);
             setLoadingMessage('');
         }
-    }, [sessionHistory, handleError, clearHistory, addMessage]);
+    }, [sessionHistory, handleError, clearHistory, addMessage, upsertComponent]);
 
     const executeGeneration = useCallback(async (concept: CreativeConcept, memoryStatus: ObservabilityMetrics['memoryStatus']) => {
-        if (!generationSettings) {
-            handleError(new Error("Generation settings are missing."));
-            return;
-        }
+        // Fallback defaults to ensure generation works even if state is missing (e.g. reload)
+        const settings = generationSettings || {
+            aspectRatio: "16:9",
+            format: "video",
+            imageQuality: "1080p",
+            videoQuality: "1080p",
+            voiceStyle: "professional",
+            language: "en-US",
+            targetDuration: "medium"
+        };
 
         try {
             setIsLoading(true);
             setAiResponse(null);
             // We don't clear history here as we want to keep the conversation going
 
-            const { format, aspectRatio, imageQuality, videoQuality, voiceStyle, language, uploadedImage } = generationSettings;
+            const { format, aspectRatio, imageQuality, videoQuality, voiceStyle, language, uploadedImage } = settings;
             
             const result = await generateFinalAsset(
                 concept,

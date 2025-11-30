@@ -6,6 +6,7 @@ import { Icon } from './Icon';
 interface ConceptSelectorProps {
   data: {
     concepts: CreativeConcept[];
+    status?: 'STREAMING' | 'READY';
   };
   onSelect: (concept: CreativeConcept) => void;
 }
@@ -61,8 +62,41 @@ const ScoreRing: React.FC<{ score: number }> = ({ score }) => {
   );
 };
 
+const SkeletonCard: React.FC = () => (
+    <div className="relative p-1 rounded-2xl z-0 opacity-50">
+        <div className="relative h-full bg-[var(--color-background-glass)] rounded-xl border border-[var(--color-border-primary)] p-6 flex flex-col gap-4 overflow-hidden">
+            {/* Shimmer Effect */}
+            <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent z-10" />
+            
+            <div className="flex justify-between items-start gap-4">
+                <div className="w-full">
+                    <div className="h-6 w-3/4 bg-white/10 rounded mb-2 animate-pulse"></div>
+                    <div className="h-4 w-1/4 bg-white/5 rounded animate-pulse"></div>
+                </div>
+                <div className="w-12 h-12 rounded-full bg-white/5 animate-pulse shrink-0"></div>
+            </div>
+            
+            <div className="space-y-2 mt-4">
+                <div className="h-3 w-full bg-white/5 rounded animate-pulse"></div>
+                <div className="h-3 w-5/6 bg-white/5 rounded animate-pulse"></div>
+                <div className="h-3 w-4/6 bg-white/5 rounded animate-pulse"></div>
+            </div>
+            
+            <div className="mt-auto pt-4 border-t border-white/5">
+                <div className="h-3 w-1/3 bg-white/5 rounded animate-pulse mb-2"></div>
+                <div className="h-16 w-full bg-black/20 rounded animate-pulse"></div>
+            </div>
+        </div>
+    </div>
+);
+
 export const ConceptSelector: React.FC<ConceptSelectorProps> = ({ data, onSelect }) => {
   const [selectedId, setSelectedId] = useState<string | number | null>(null);
+
+  // We expect 3 concepts total. If we have fewer, render skeletons.
+  const concepts = data.concepts || [];
+  const skeletonsNeeded = Math.max(0, 3 - concepts.length);
+  const skeletons = Array.from({ length: skeletonsNeeded });
 
   return (
     <div className="w-full my-4">
@@ -71,10 +105,16 @@ export const ConceptSelector: React.FC<ConceptSelectorProps> = ({ data, onSelect
           <h3 className="text-xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-white/60">
             Select Concept Strategy
           </h3>
+          {skeletonsNeeded > 0 && (
+             <span className="ml-2 text-xs font-mono text-[var(--color-text-accent)] animate-pulse">
+                Receiving Stream...
+             </span>
+          )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {data.concepts.map((concept) => {
+        {/* Render Actual Concepts */}
+        {concepts.map((concept) => {
             const isSelected = selectedId === concept.id;
             const score = concept.score || concept.evaluation?.score || 0;
 
@@ -175,6 +215,11 @@ export const ConceptSelector: React.FC<ConceptSelectorProps> = ({ data, onSelect
                 </motion.div>
             );
         })}
+
+        {/* Render Skeletons for missing cards */}
+        {skeletons.map((_, idx) => (
+            <SkeletonCard key={`skeleton-${idx}`} />
+        ))}
       </div>
     </div>
   );

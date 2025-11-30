@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Header } from './components/Header';
 import { PromptBar } from './components/PromptBar';
@@ -11,6 +12,7 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { SettingsModal } from './components/SettingsModal';
 import { AppBackground } from './components/AppBackground';
 import { SessionSidebar } from './components/SessionSidebar';
+import { AgentSwarmList } from './components/AgentSwarmList';
 import { ContentReel } from './components/ContentReel';
 import { useAppUI } from './hooks/useAppUI';
 import { useSession } from './hooks/useSession';
@@ -92,9 +94,9 @@ export const App: React.FC = () => {
       
       <div className="flex h-screen w-full overflow-hidden relative z-10 text-[var(--color-text-primary)] font-sans selection:bg-[var(--color-primary)] selection:text-white">
         
-        {/* Sidebar Panel - Only visible in creator mode */}
+        {/* Left Sidebar: Context & Memory */}
         {view === 'creator' && (
-          <div className="w-64 h-full flex-shrink-0 border-r border-[var(--color-border-primary)] bg-[var(--color-background-glass)] backdrop-blur-xl hidden md:block">
+          <aside className="w-64 h-full flex-shrink-0 border-r border-[var(--color-border-primary)] bg-[var(--color-background-glass)] backdrop-blur-xl hidden md:block z-20">
             <div className="p-6">
                 <Header 
                   currentView={view} 
@@ -113,13 +115,13 @@ export const App: React.FC = () => {
                 onDeleteSession={handleDeleteSession}
               />
             </div>
-          </div>
+          </aside>
         )}
 
-        {/* Main Content Area */}
+        {/* Center: Main Cockpit Canvas */}
         <div className="flex-1 flex flex-col relative h-full overflow-hidden">
            {view !== 'creator' && (
-               <div className="w-full border-b border-[var(--color-border-primary)] bg-[var(--color-background-glass)] backdrop-blur-md px-6 py-4">
+               <div className="w-full border-b border-[var(--color-border-primary)] bg-[var(--color-background-glass)] backdrop-blur-md px-6 py-4 z-20">
                   <Header 
                     currentView={view} 
                     onSetView={handleSetView}
@@ -164,6 +166,14 @@ export const App: React.FC = () => {
              </div>
            )}
         </div>
+
+        {/* Right Sidebar: Agent Swarm Visibility */}
+        {view === 'creator' && (
+          <aside className="w-72 h-full flex-shrink-0 border-l border-[var(--color-border-primary)] bg-[var(--color-background-glass)] backdrop-blur-xl hidden lg:block z-20 p-6">
+             <AgentSwarmList />
+          </aside>
+        )}
+
       </div>
       
       {showMemoryModal && memoryPattern && (

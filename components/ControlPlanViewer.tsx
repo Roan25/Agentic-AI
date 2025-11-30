@@ -25,7 +25,19 @@ export const ControlPlanViewer: React.FC<ControlPlanViewerProps> = ({ uiComponen
 
         {statusComponents.length > 0 ? (
           <div className="space-y-3">
-            {statusComponents.map((bar, index) => <StatusBar key={index} component={bar} />)}
+             <div className="flex justify-between items-center text-xs text-[var(--color-text-secondary)] uppercase tracking-wider px-1">
+                <span>Step / Tool</span>
+                <span>Status</span>
+             </div>
+            {statusComponents.map((bar, index) => (
+                <div key={index} className="relative group">
+                     {/* Connecting line */}
+                     {index < statusComponents.length - 1 && (
+                        <div className="absolute left-[19px] top-10 bottom-[-14px] w-0.5 bg-[var(--color-border-primary)] -z-10 group-hover:bg-[var(--color-primary)]/50 transition-colors"></div>
+                     )}
+                     <StatusBar component={bar} />
+                </div>
+            ))}
           </div>
         ) : (
           <div className="text-center py-10 text-[var(--color-text-secondary)] bg-black/20 rounded-lg">

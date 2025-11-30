@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+
+import React from 'react';
 import { motion } from 'framer-motion';
 import { Icon } from './Icon';
 import { useAsyncJob } from '../hooks/useAsyncJob';
@@ -37,10 +38,12 @@ export const JobProgress: React.FC<JobProgressProps> = ({ jobId, status: initial
 
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-center mb-2">
-            <h4 className="text-sm font-bold text-[var(--color-text-primary)] truncate pr-2">
+            <h4 className="text-sm font-bold text-[var(--color-text-primary)] truncate pr-2 flex items-center gap-2">
                 {currentStatus === 'COMPLETE' ? 'Generation Complete' : 
                  currentStatus === 'FAILED' ? 'Generation Failed' :
                  'Rendering Asset...'}
+                 
+                 {jobId && <span className="text-[10px] font-mono text-[var(--color-text-secondary)] opacity-50 font-normal">ID: {jobId}</span>}
             </h4>
             <span className="text-xs font-mono text-[var(--color-text-secondary)] whitespace-nowrap">
                 {currentStatus === 'COMPLETE' ? '100%' : `${Math.round(progress)}%`}
@@ -54,17 +57,22 @@ export const JobProgress: React.FC<JobProgressProps> = ({ jobId, status: initial
                 initial={{ width: 0 }}
                 animate={{ width: `${progress}%` }}
                 transition={{ type: 'spring', stiffness: 50, damping: 20 }}
-                className={`h-full rounded-full ${
+                className={`h-full rounded-full relative overflow-hidden ${
                     currentStatus === 'COMPLETE' ? 'bg-green-500' :
                     currentStatus === 'FAILED' ? 'bg-red-500' :
                     'bg-[var(--gradient-primary)]'
                 }`}
-            />
-            
-            {/* Shimmer Effect for Processing */}
-            {currentStatus === 'PROCESSING' && (
-                 <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[shimmer_2s_infinite]" style={{ backgroundSize: '200% 100%' }}></div>
-            )}
+            >
+                {/* Shimmer Overlay (only when processing) */}
+                {currentStatus !== 'COMPLETE' && currentStatus !== 'FAILED' && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent w-full h-full animate-[shimmer_1.5s_infinite] translate-x-[-100%]" style={{
+                        animationName: 'shimmer',
+                        animationDuration: '1.5s',
+                        animationIterationCount: 'infinite',
+                        backgroundImage: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)'
+                    }}></div>
+                )}
+            </motion.div>
         </div>
         
         <div className="flex justify-between items-center mt-2">
@@ -74,12 +82,24 @@ export const JobProgress: React.FC<JobProgressProps> = ({ jobId, status: initial
                  'The swarm is compiling your video...'}
             </p>
             {currentStatus === 'COMPLETE' && resultUrl && (
-                <button className="text-[10px] uppercase font-bold text-[var(--color-text-accent)] hover:text-white transition-colors flex items-center gap-1">
-                    View <Icon path="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" className="w-3 h-3" />
-                </button>
+                <motion.button 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="px-3 py-1 rounded bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white text-[10px] uppercase font-bold tracking-wide transition-colors flex items-center gap-1 shadow-lg"
+                    onClick={() => onJobComplete && onJobComplete(resultUrl)}
+                >
+                    View Result <Icon path="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" className="w-3 h-3" />
+                </motion.button>
             )}
         </div>
       </div>
+      
+      <style>{`
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+      `}</style>
     </div>
   );
 };
